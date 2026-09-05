@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>강화의 전장</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+
+  :root{
+    --bg: #12111a;
+    --panel: #1c1a28;
+    --panel-2: #24212f;
+    --line: #38344a;
+    --gold: #c9a227;
+    --gold-soft: #8a7326;
+    --ink: #ece7d8;
+    --ink-dim: #9a94a8;
+    --atk: #b0374a;
+    --atk-soft: #4a2029;
+    --def: #3a72b5;
+    --def-soft: #1f2e42;
+    --enh: #9457c9;
+    --enh-soft: #2c2140;
+    --heal: #4caf7d;
+    --heal-soft: #1f3b2c;
+  }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin:0;
+    background: radial-gradient(ellipse at 50% -10%, #211f30 0%, var(--bg) 55%);
+    color: var(--ink);
+    font-family: 'Noto Sans KR', system-ui, sans-serif;
+    min-height: 100vh;
+    display:flex;
+    justify-content:center;
+    padding: 28px 14px 60px;
+  }
+
+  .app{ width: 100%; max-width: 760px; }
+
+  h1{
+    font-family:'Cinzel','Noto Sans KR',serif;
+    font-weight:700;
+    letter-spacing: 1px;
+    font-size: 26px;
+    text-align:center;
+    margin: 0 0 4px;
+    color: var(--gold);
+  }
+  .subtitle{
+    text-align:center;
+    color: var(--ink-dim);
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+
+  .turn-counter{
+    text-align:center;
+    font-family:'Cinzel',serif;
+    font-size: 13px;
+    letter-spacing: 1px;
+    color: var(--gold-soft);
+    margin-bottom: 10px;
+  }
+  .turn-counter b{ color: var(--gold); font-size:15px; }
+
+  /* ===== 전장 (board) ===== */
+  .board{
+    background: linear-gradient(180deg, var(--panel) 0%, #17151f 100%);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px 22px;
+    margin-bottom: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  }
+
+  .fighter-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap: 16px;
+  }
+  .fighter{ flex:1; }
+  .fighter.ai{ text-align:right; }
+
+  .fighter-name{
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    color: var(--ink-dim);
+    margin-bottom: 6px;
+  }
+  .fighter-name b{ color: var(--ink); font-size:15px; }
+
+  .hpbar-track{
+    height: 14px;
+    background: #0e0d14;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow:hidden;
+    position:relative;
+  }
+  .hpbar-fill{
+    height:100%;
+    background: linear-gradient(90deg, #7a2230, var(--atk));
+    transition: width 0.5s ease;
+  }
+  .fighter.ai .hpbar-fill{
+    background: linear-gradient(90deg, var(--def), #244766);
+  }
+  .hp-num{
+    font-size: 12px;
+    color: var(--ink-dim);
+    margin-top: 4px;
+  }
+
+  .vs{
+    font-family:'Cinzel',serif;
+    font-size: 20px;
+    color: var(--gold-soft);
+    padding: 0 6px;
+  }
+
+  .log{
+    margin-top: 18px;
+    border-top: 1px dashed var(--line);
+    padding-top: 12px;
+    font-size: 13px;
+    color: var(--ink-dim);
+    line-height: 1.7;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+  .log .turn-tag{
+    color: var(--gold);
+    font-weight: 700;
+    margin-right: 4px;
+  }
+  .log p{ margin: 0 0 2px; }
+
+  .phase-banner{
+    text-align:center;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 14px;
+  }
+  .phase-banner.enemy{ color: #e8b8c2; }
+  .phase-banner.player{ color: #bfe0ff; }
+
+  /* ===== 카드 구역 ===== */
+  .zone{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px 18px;
+    margin-bottom: 14px;
+  }
+  .zone-title{
+    font-size: 12px;
+    color: var(--ink-dim);
+    margin-bottom: 10px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .zone-title .dot{
+    width:7px; height:7px; border-radius:50%;
+  }
+  .dot.n{ background: var(--gold); }
+  .dot.e{ background: var(--enh); }
+
+  .hand{
+    display:flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .card{
+    width: 72px;
+    height: 98px;
+    border-radius: 8px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    border: 2px solid transparent;
+    position:relative;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    user-select:none;
+    background: var(--panel-2);
+  }
+  .card:hover{ transform: translateY(-4px); }
+  .card.selected{
+    transform: translateY(-8px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+  }
+  .card.disabled{
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .card.disabled:hover{ transform:none; }
+
+  .card.attack{ border-color: var(--atk-soft); }
+  .card.attack.selected{ border-color: var(--atk); background: linear-gradient(160deg, var(--atk-soft), var(--panel-2)); }
+  .card.defense{ border-color: var(--def-soft); }
+  .card.defense.selected{ border-color: var(--def); background: linear-gradient(160deg, var(--def-soft), var(--panel-2)); }
+  .card.heal{ border-color: var(--heal-soft); }
+  .card.heal.selected{ border-color: var(--heal); background: linear-gradient(160deg, var(--heal-soft), var(--panel-2)); }
+  .card.enhance{ border-color: var(--enh-soft); }
+  .card.enhance.selected{ border-color: var(--enh); background: linear-gradient(160deg, var(--enh-soft), var(--panel-2)); }
+  .card.reusable::after{
+    content:'재사용';
+    position:absolute;
+    bottom:5px;
+    font-size: 8px;
+    color: var(--ink-dim);
+    letter-spacing:0.5px;
+  }
+
+  .card-label{
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    color: var(--ink-dim);
+    margin-bottom: 4px;
+  }
+  .card-value{
+    font-family:'Cinzel',serif;
+    font-size: 24px;
+    font-weight:700;
+    color: var(--ink);
+  }
+  .card.enhance .card-value{ font-size: 16px; }
+
+  .empty-hint{
+    font-size: 12px;
+    color: var(--ink-dim);
+    padding: 20px 0;
+  }
+
+  /* ===== 액션 ===== */
+  .actions{
+    display:flex;
+    gap: 10px;
+    justify-content:center;
+    margin-top: 6px;
+  }
+  button{
+    font-family:'Noto Sans KR', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 12px 22px;
+    border-radius: 8px;
+    border: none;
+    cursor:pointer;
+    transition: filter 0.15s ease, transform 0.1s ease;
+  }
+  button:active{ transform: scale(0.97); }
+  button:disabled{ opacity: 0.35; cursor:not-allowed; }
+
+  .btn-primary{ background: var(--gold); color: #1a1712; }
+  .btn-primary:hover:not(:disabled){ filter: brightness(1.1); }
+  .btn-heal{ background: var(--heal); color: #0f1f16; }
+  .btn-heal:hover:not(:disabled){ filter: brightness(1.1); }
+  .btn-secondary{ background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); }
+  .btn-secondary:hover:not(:disabled){ background: #2c2938; }
+  .btn-danger{ background: transparent; color: var(--ink-dim); border: 1px solid var(--line); }
+
+  .preview{
+    text-align:center;
+    font-size: 13px;
+    color: var(--ink-dim);
+    margin-bottom: 10px;
+    min-height: 18px;
+  }
+  .preview b{ color: var(--gold); }
+
+  .end-overlay{
+    position:fixed; inset:0;
+    background: rgba(10,9,15,0.86);
+    display:flex; align-items:center; justify-content:center;
+    z-index: 50;
+  }
+  .end-card{
+    background: var(--panel);
+    border: 1px solid var(--gold-soft);
+    border-radius: 12px;
+    padding: 40px 50px;
+    text-align:center;
+  }
+  .end-card h2{
+    font-family:'Cinzel',serif;
+    color: var(--gold);
+    font-size: 30px;
+    margin: 0 0 10px;
+  }
+  .end-card p{ color: var(--ink-dim); margin-bottom: 22px; }
+
+  @media (max-width: 480px){
+    .card{ width: 58px; height: 82px; }
+    .card-value{ font-size: 18px; }
+    h1{ font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>강화의 전장</h1>
+  <div class="subtitle">공격·방어·회복 카드를 굴리고, 강화카드로 공격력을 끌어올려라</div>
+  <div class="turn-counter">TURN <b id="turnNum">1</b></div>
+
+  <div class="board">
+    <div class="fighter-row">
+      <div class="fighter">
+        <div class="fighter-name"><b>플레이어</b></div>
+        <div class="hpbar-track"><div class="hpbar-fill" id="playerHpFill"></div></div>
+        <div class="hp-num" id="playerHpNum">100 / 100</div>
+      </div>
+      <div class="vs">VS</div>
+      <div class="fighter ai">
+        <div class="fighter-name"><b>AI</b></div>
+        <div class="hpbar-track"><div class="hpbar-fill" id="aiHpFill"></div></div>
+        <div class="hp-num" id="aiHpNum">100 / 100</div>
+      </div>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <div class="phase-banner" id="phaseBanner">플레이어의 턴</div>
+  <div class="preview" id="preview">&nbsp;</div>
+
+  <div class="zone">
+    <div class="zone-title"><span class="dot n"></span>일반카드 (공격 / 방어 / 회복) · 최대 7장</div>
+    <div class="hand" id="normalHand"></div>
+  </div>
+
+  <div class="zone">
+    <div class="zone-title"><span class="dot e"></span>강화카드 (선택한 공격에 랜덤 보너스)</div>
+    <div class="hand" id="enhanceHand"></div>
+  </div>
+
+  <div class="actions" id="actionBar"></div>
+</div>
+
+<div id="endOverlay" style="display:none;"></div>
+
+<script>
+(function(){
+  const PLAYER_MAX_HP = 100;
+  const AI_MAX_HP = 100;
+  const HAND_SIZE = 7;
+  const ENHANCE_HAND_SIZE = 2;
+
+  let state = {
+    playerHp: PLAYER_MAX_HP,
+    aiHp: AI_MAX_HP,
+    playerHand: [],
+    playerEnhance: [],
+    aiHand: [],
+    aiEnhance: [],
+    turn: 1,
+    phase: 'PLAYER_ATTACK',
+    selectedAttackId: null,
+    selectedEnhanceId: null,
+    selectedHealId: null,
+    selectedDefenseId: null,
+    pendingAiAttack: null,
+    gameOver: false,
+    idSeq: 1
+  };
+
+  function uid(){ return state.idSeq++; }
+  function randInt(min, max){ return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+  const ENHANCE_RANGES = [ [1,3], [2,4], [3,5], [3,7], [4,8], [5,9], [6,11] ];
+
+  function makeCard(){
+    const r = Math.random();
+    if(r < 0.42) return { id: uid(), type:'attack', value: randInt(1,14) };
+    if(r < 0.80) return { id: uid(), type:'defense', value: randInt(1,14) };
+    return { id: uid(), type:'heal', value: randInt(1,20) };
+  }
+  function makeEnhanceCard(){
+    const r = ENHANCE_RANGES[randInt(0, ENHANCE_RANGES.length-1)];
+    return { id: uid(), type:'enhance', min:r[0], max:r[1] };
+  }
+  function makeHand(size){
+    const hand = [];
+    for(let i=0;i<size;i++) hand.push(makeCard());
+    if(!hand.some(c=>c.type==='attack')) hand[0] = { id: uid(), type:'attack', value: randInt(1,14) };
+    return hand;
+  }
+  function makeEnhanceHand(size){
+    const hand = [];
+    for(let i=0;i<size;i++) hand.push(makeEnhanceCard());
+    return hand;
+  }
+  function refill(hand){
+    while(hand.length < HAND_SIZE) hand.push(makeCard());
+  }
+  function refillEnhance(hand){
+    while(hand.length < ENHANCE_HAND_SIZE) hand.push(makeEnhanceCard());
+  }
+
+  function init(){
+    state.playerHand = makeHand(HAND_SIZE);
+    state.playerEnhance = makeEnhanceHand(ENHANCE_HAND_SIZE);
+    state.aiHand = makeHand(HAND_SIZE);
+    state.aiEnhance = makeEnhanceHand(ENHANCE_HAND_SIZE);
+    log('전투 시작! 체력 100으로 맞붙는다. 손패는 최대 7장, 방어카드는 몇 번이든 재사용할 수 있다.', 'sys');
+    render();
+  }
+
+  function log(msg, tag){
+    const el = document.getElementById('log');
+    const p = document.createElement('p');
+    const tagText = tag === 'player' ? '[플레이어] ' : tag === 'ai' ? '[AI] ' : '';
+    p.innerHTML = (tagText ? `<span class="turn-tag">${tagText}</span>` : '') + msg;
+    el.appendChild(p);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function setHp(who, val){
+    if(who==='player') state.playerHp = Math.max(0, Math.min(PLAYER_MAX_HP, val));
+    else state.aiHp = Math.max(0, Math.min(AI_MAX_HP, val));
+  }
+
+  // ============ 렌더링 ============
+  function render(){
+    document.getElementById('turnNum').textContent = state.turn;
+    document.getElementById('playerHpNum').textContent = `${state.playerHp} / ${PLAYER_MAX_HP}`;
+    document.getElementById('aiHpNum').textContent = `${state.aiHp} / ${AI_MAX_HP}`;
+    document.getElementById('playerHpFill').style.width = (state.playerHp/PLAYER_MAX_HP*100)+'%';
+    document.getElementById('aiHpFill').style.width = (state.aiHp/AI_MAX_HP*100)+'%';
+
+    renderBanner();
+    renderNormalHand();
+    renderEnhanceHand();
+    renderActions();
+    renderPreview();
+  }
+
+  function renderBanner(){
+    const b = document.getElementById('phaseBanner');
+    if(state.phase === 'PLAYER_ATTACK'){
+      b.textContent = '플레이어의 턴 — 공격 / 회복 카드를 선택하세요 (강화카드는 선택사항)';
+      b.className = 'phase-banner player';
+    } else if(state.phase === 'PLAYER_DEFEND'){
+      const atk = state.pendingAiAttack;
+      b.textContent = `AI의 공격! 공격력 ${atk.total} — 방어카드를 선택하거나 그대로 맞으세요`;
+      b.className = 'phase-banner enemy';
+    }
+  }
+
+  function renderNormalHand(){
+    const el = document.getElementById('normalHand');
+    el.innerHTML = '';
+    if(state.playerHand.length === 0){
+      el.innerHTML = '<div class="empty-hint">손에 든 일반카드가 없습니다.</div>';
+      return;
+    }
+    state.playerHand.forEach(card=>{
+      const div = document.createElement('div');
+      const isAttackPhase = state.phase === 'PLAYER_ATTACK';
+      const isDefendPhase = state.phase === 'PLAYER_DEFEND';
+      let selectable = false;
+      let selected = false;
+
+      if(isAttackPhase && card.type === 'attack'){
+        selectable = true;
+        selected = state.selectedAttackId === card.id;
+      } else if(isAttackPhase && card.type === 'heal'){
+        selectable = true;
+        selected = state.selectedHealId === card.id;
+      } else if(isDefendPhase && card.type === 'defense'){
+        selectable = true;
+        selected = state.selectedDefenseId === card.id;
+      }
+
+      const label = card.type==='attack' ? '공격' : card.type==='defense' ? '방어' : '회복';
+      div.className = `card ${card.type} ${selected ? 'selected':''} ${selectable ? '' : 'disabled'} ${card.type==='defense' ? 'reusable':''}`;
+      div.innerHTML = `
+        <div class="card-label">${label}</div>
+        <div class="card-value">${card.value}</div>
+      `;
+      if(selectable){
+        div.onclick = () => {
+          if(card.type === 'attack'){
+            state.selectedAttackId = (state.selectedAttackId === card.id) ? null : card.id;
+            state.selectedHealId = null;
+          } else if(card.type === 'heal'){
+            state.selectedHealId = (state.selectedHealId === card.id) ? null : card.id;
+            state.selectedAttackId = null;
+            state.selectedEnhanceId = null;
+          } else {
+            state.selectedDefenseId = (state.selectedDefenseId === card.id) ? null : card.id;
+          }
+          render();
+        };
+      }
+      el.appendChild(div);
+    });
+  }
+
+  function renderEnhanceHand(){
+    const el = document.getElementById('enhanceHand');
+    el.innerHTML = '';
+    if(state.playerEnhance.length === 0){
+      el.innerHTML = '<div class="empty-hint">강화카드가 없습니다.</div>';
+      return;
+    }
+    const isAttackPhase = state.phase === 'PLAYER_ATTACK';
+    const canUseEnhance = isAttackPhase && state.selectedAttackId !== null;
+
+    state.playerEnhance.forEach(card=>{
+      const div = document.createElement('div');
+      const selected = state.selectedEnhanceId === card.id;
+      div.className = `card enhance ${selected ? 'selected':''} ${canUseEnhance ? '' : 'disabled'}`;
+      div.innerHTML = `
+        <div class="card-label">강화</div>
+        <div class="card-value">${card.min}~${card.max}</div>
+      `;
+      if(canUseEnhance){
+        div.onclick = () => {
+          state.selectedEnhanceId = (state.selectedEnhanceId === card.id) ? null : card.id;
+          render();
+        };
+      }
+      el.appendChild(div);
+    });
+  }
+
+  function renderPreview(){
+    const el = document.getElementById('preview');
+    if(state.phase === 'PLAYER_ATTACK'){
+      if(state.selectedAttackId){
+        const atk = state.playerHand.find(c=>c.id===state.selectedAttackId);
+        if(state.selectedEnhanceId){
+          const enh = state.playerEnhance.find(c=>c.id===state.selectedEnhanceId);
+          el.innerHTML = `공격력 <b>${atk.value}</b> + 강화 <b>${enh.min}~${enh.max}</b> (랜덤 적용 예정)`;
+        } else {
+          el.innerHTML = `공격력 <b>${atk.value}</b> 로 공격 준비`;
+        }
+      } else if(state.selectedHealId){
+        const heal = state.playerHand.find(c=>c.id===state.selectedHealId);
+        el.innerHTML = `체력 <b>${heal.value}</b> 회복 예정`;
+      } else {
+        el.innerHTML = '&nbsp;';
+      }
+    } else if(state.phase === 'PLAYER_DEFEND'){
+      const atk = state.pendingAiAttack;
+      if(state.selectedDefenseId){
+        const def = state.playerHand.find(c=>c.id===state.selectedDefenseId);
+        const dmg = Math.max(0, atk.total - def.value);
+        el.innerHTML = `방어력 <b>${def.value}</b> 적용 시 예상 피해 <b>${dmg}</b> (재사용 가능)`;
+      } else {
+        el.innerHTML = `방어하지 않으면 <b>${atk.total}</b> 의 피해를 그대로 받습니다`;
+      }
+    } else {
+      el.innerHTML = '&nbsp;';
+    }
+  }
+
+  function renderActions(){
+    const bar = document.getElementById('actionBar');
+    bar.innerHTML = '';
+
+    if(state.phase === 'PLAYER_ATTACK'){
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'btn-primary';
+      confirmBtn.textContent = '공격!';
+      confirmBtn.disabled = !state.selectedAttackId;
+      confirmBtn.onclick = resolvePlayerAttack;
+      bar.appendChild(confirmBtn);
+
+      const healBtn = document.createElement('button');
+      healBtn.className = 'btn-heal';
+      healBtn.textContent = '회복!';
+      healBtn.disabled = !state.selectedHealId;
+      healBtn.onclick = resolvePlayerHeal;
+      bar.appendChild(healBtn);
+
+      const passBtn = document.createElement('button');
+      passBtn.className = 'btn-secondary';
+      passBtn.textContent = '패스';
+      passBtn.onclick = () => {
+        log('공격을 아끼고 턴을 넘겼다.', 'player');
+        clearSelections();
+        startAiTurn();
+      };
+      bar.appendChild(passBtn);
+
+    } else if(state.phase === 'PLAYER_DEFEND'){
+      const defendBtn = document.createElement('button');
+      defendBtn.className = 'btn-primary';
+      defendBtn.textContent = '방어!';
+      defendBtn.disabled = !state.selectedDefenseId;
+      defendBtn.onclick = resolvePlayerDefend;
+      bar.appendChild(defendBtn);
+
+      const takeBtn = document.createElement('button');
+      takeBtn.className = 'btn-danger';
+      takeBtn.textContent = '그냥 맞는다';
+      takeBtn.onclick = () => resolvePlayerDefend(true);
+      bar.appendChild(takeBtn);
+    }
+  }
+
+  function clearSelections(){
+    state.selectedAttackId = null;
+    state.selectedEnhanceId = null;
+    state.selectedHealId = null;
+    state.selectedDefenseId = null;
+  }
+
+  // ============ 플레이어 회복 처리 ============
+  function resolvePlayerHeal(){
+    const card = state.playerHand.find(c=>c.id===state.selectedHealId);
+    if(!card) return;
+    state.playerHand = state.playerHand.filter(c=>c.id!==card.id);
+    setHp('player', state.playerHp + card.value);
+    log(`회복카드로 체력을 <b>${card.value}</b> 회복했다. (현재 ${state.playerHp}/${PLAYER_MAX_HP})`, 'player');
+    refill(state.playerHand);
+    clearSelections();
+    render();
+    setTimeout(startAiTurn, 500);
+  }
+
+  // ============ 플레이어 공격 처리 ============
+  function resolvePlayerAttack(){
+    const atkCard = state.playerHand.find(c=>c.id===state.selectedAttackId);
+    if(!atkCard) return;
+    let total = atkCard.value;
+    let bonusText = '';
+
+    if(state.selectedEnhanceId){
+      const enh = state.playerEnhance.find(c=>c.id===state.selectedEnhanceId);
+      const bonus = randInt(enh.min, enh.max);
+      total += bonus;
+      bonusText = ` (강화 +${bonus})`;
+      state.playerEnhance = state.playerEnhance.filter(c=>c.id!==enh.id);
+      refillEnhance(state.playerEnhance);
+    }
+
+    state.playerHand = state.playerHand.filter(c=>c.id!==atkCard.id);
+    refill(state.playerHand);
+
+    const aiDefense = aiDecideDefense(total);
+    let dmg = total;
+    if(aiDefense){
+      dmg = Math.max(0, total - aiDefense.value);
+      log(`공격력 ${atkCard.value}${bonusText} = 총 ${total}의 공격! AI가 방어카드 ${aiDefense.value}로 막아 <b>${dmg}</b>의 피해를 입혔다. (AI 방어카드는 재사용됨)`, 'player');
+    } else {
+      log(`공격력 ${atkCard.value}${bonusText} = 총 ${total}의 공격이 그대로 적중! <b>${dmg}</b>의 피해.`, 'player');
+    }
+
+    setHp('ai', state.aiHp - dmg);
+    clearSelections();
+    render();
+
+    if(checkGameOver()) return;
+
+    setTimeout(startAiTurn, 650);
+  }
+
+  // 방어카드는 소모되지 않고 재사용 가능 (제거하지 않음)
+  function aiDecideDefense(incomingDamage){
+    const defenses = state.aiHand.filter(c=>c.type==='defense');
+    if(defenses.length === 0) return null;
+
+    const hpRatio = state.aiHp / AI_MAX_HP;
+    const threat = incomingDamage / AI_MAX_HP;
+    const willingness = threat > 0.15 || hpRatio < 0.45 ? 0.85 : 0.35;
+
+    if(Math.random() < willingness){
+      defenses.sort((a,b)=>b.value-a.value);
+      return defenses[0];
+    }
+    return null;
+  }
+
+  // ============ AI 턴 ============
+  function startAiTurn(){
+    if(state.gameOver) return;
+
+    const hpRatio = state.aiHp / AI_MAX_HP;
+    const heals = state.aiHand.filter(c=>c.type==='heal');
+    // 체력이 낮으면 회복을 우선 고려
+    if(hpRatio < 0.4 && heals.length > 0 && Math.random() < 0.6){
+      heals.sort((a,b)=>b.value-a.value);
+      const heal = heals[0];
+      state.aiHand = state.aiHand.filter(c=>c.id!==heal.id);
+      setHp('ai', state.aiHp + heal.value);
+      refill(state.aiHand);
+      log(`회복카드로 체력을 ${heal.value} 회복했다. (현재 ${state.aiHp}/${AI_MAX_HP})`, 'ai');
+      state.turn += 1;
+      state.phase = 'PLAYER_ATTACK';
+      render();
+      return;
+    }
+
+    const attacks = state.aiHand.filter(c=>c.type==='attack');
+    if(attacks.length === 0){
+      log('공격카드가 없어 턴을 넘겼다.', 'ai');
+      state.turn += 1;
+      state.phase = 'PLAYER_ATTACK';
+      render();
+      return;
+    }
+
+    attacks.sort((a,b)=>b.value-a.value);
+    const chosen = attacks[0];
+    state.aiHand = state.aiHand.filter(c=>c.id!==chosen.id);
+    refill(state.aiHand);
+
+    let total = chosen.value;
+    let bonusText = '';
+    const useEnhance = state.aiEnhance.length > 0 && (hpRatio < 0.5 || Math.random() < 0.45);
+    if(useEnhance){
+      const enh = state.aiEnhance[randInt(0, state.aiEnhance.length-1)];
+      const bonus = randInt(enh.min, enh.max);
+      total += bonus;
+      bonusText = ` (강화 +${bonus})`;
+      state.aiEnhance = state.aiEnhance.filter(c=>c.id!==enh.id);
+      refillEnhance(state.aiEnhance);
+    }
+
+    state.pendingAiAttack = { base: chosen.value, total, bonusText };
+    log(`공격력 ${chosen.value}${bonusText} = 총 ${total}의 공격을 준비한다!`, 'ai');
+    state.phase = 'PLAYER_DEFEND';
+    render();
+  }
+
+  function resolvePlayerDefend(forceTake){
+    const atk = state.pendingAiAttack;
+    let dmg = atk.total;
+    if(!forceTake && state.selectedDefenseId){
+      const def = state.playerHand.find(c=>c.id===state.selectedDefenseId);
+      dmg = Math.max(0, atk.total - def.value);
+      log(`AI의 공격 ${atk.total} 를 방어카드 ${def.value}로 막아 <b>${dmg}</b>의 피해만 받았다. (이 방어카드는 계속 손에 남는다)`, 'player');
+    } else {
+      log(`AI의 공격 ${atk.total}을 그대로 맞아 <b>${dmg}</b>의 피해를 입었다.`, 'player');
+    }
+
+    setHp('player', state.playerHp - dmg);
+    state.pendingAiAttack = null;
+    clearSelections();
+    render();
+
+    if(checkGameOver()) return;
+
+    state.turn += 1;
+    state.phase = 'PLAYER_ATTACK';
+    render();
+  }
+
+  function checkGameOver(){
+    if(state.aiHp <= 0){
+      endGame(true);
+      return true;
+    }
+    if(state.playerHp <= 0){
+      endGame(false);
+      return true;
+    }
+    return false;
+  }
+
+  function endGame(playerWon){
+    state.gameOver = true;
+    const overlay = document.getElementById('endOverlay');
+    overlay.style.display = 'flex';
+    overlay.className = 'end-overlay';
+    overlay.innerHTML = `
+      <div class="end-card">
+        <h2>${playerWon ? '승리!' : '패배...'}</h2>
+        <p>${playerWon ? 'AI의 체력을 0으로 만들고 전장을 지배했다.' : '내 체력이 0이 되어 쓰러졌다.'}</p>
+        <button class="btn-primary" id="restartBtn">다시 대결하기</button>
+      </div>
+    `;
+    document.getElementById('restartBtn').onclick = () => {
+      overlay.style.display = 'none';
+      state = {
+        playerHp: PLAYER_MAX_HP, aiHp: AI_MAX_HP,
+        playerHand: [], playerEnhance: [], aiHand: [], aiEnhance: [],
+        turn: 1,
+        phase: 'PLAYER_ATTACK',
+        selectedAttackId: null, selectedEnhanceId: null, selectedHealId: null, selectedDefenseId: null,
+        pendingAiAttack: null, gameOver: false, idSeq: 1
+      };
+      document.getElementById('log').innerHTML = '';
+      init();
+    };
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

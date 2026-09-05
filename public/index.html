@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>강화의 전장 - 대전</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+  :root{
+    --bg:#12111a; --panel:#1c1a28; --panel-2:#24212f; --line:#38344a;
+    --gold:#c9a227; --gold-soft:#8a7326; --ink:#ece7d8; --ink-dim:#9a94a8;
+    --atk:#b0374a; --atk-soft:#4a2029; --def:#3a72b5; --def-soft:#1f2e42;
+    --enh:#9457c9; --enh-soft:#2c2140; --heal:#4caf7d; --heal-soft:#1f3b2c;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:radial-gradient(ellipse at 50% -10%, #211f30 0%, var(--bg) 55%);color:var(--ink);font-family:'Noto Sans KR',system-ui,sans-serif;min-height:100vh;display:flex;justify-content:center;padding:28px 14px 60px;}
+  .app{width:100%;max-width:760px;}
+  h1{font-family:'Cinzel','Noto Sans KR',serif;font-weight:700;letter-spacing:1px;font-size:26px;text-align:center;margin:0 0 4px;color:var(--gold);}
+  .subtitle{text-align:center;color:var(--ink-dim);font-size:13px;margin-bottom:16px;}
+
+  .join-box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:30px;max-width:360px;margin:60px auto;text-align:center;}
+  .join-box input{width:100%;padding:12px;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);font-size:16px;text-align:center;letter-spacing:2px;margin-bottom:14px;}
+  .join-box button{width:100%;padding:12px;border-radius:8px;border:none;background:var(--gold);color:#1a1712;font-weight:700;font-size:15px;cursor:pointer;}
+  .join-hint{font-size:12px;color:var(--ink-dim);margin-top:14px;line-height:1.6;}
+  .join-error{color:#e08a95;font-size:13px;margin-top:8px;min-height:16px;}
+
+  .turn-counter{text-align:center;font-family:'Cinzel',serif;font-size:13px;letter-spacing:1px;color:var(--gold-soft);margin-bottom:10px;}
+  .turn-counter b{color:var(--gold);font-size:15px;}
+
+  .board{background:linear-gradient(180deg, var(--panel) 0%, #17151f 100%);border:1px solid var(--line);border-radius:10px;padding:20px 22px;margin-bottom:16px;box-shadow:0 10px 30px rgba(0,0,0,0.35);}
+  .fighter-row{display:flex;justify-content:space-between;align-items:center;gap:16px;}
+  .fighter{flex:1;} .fighter.op{text-align:right;}
+  .fighter-name{font-size:13px;letter-spacing:0.5px;color:var(--ink-dim);margin-bottom:6px;}
+  .fighter-name b{color:var(--ink);font-size:15px;}
+  .hpbar-track{height:14px;background:#0e0d14;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .hpbar-fill{height:100%;background:linear-gradient(90deg,#7a2230,var(--atk));transition:width 0.5s ease;}
+  .fighter.op .hpbar-fill{background:linear-gradient(90deg,var(--def),#244766);}
+  .hp-num{font-size:12px;color:var(--ink-dim);margin-top:4px;}
+  .vs{font-family:'Cinzel',serif;font-size:20px;color:var(--gold-soft);padding:0 6px;}
+
+  .log{margin-top:18px;border-top:1px dashed var(--line);padding-top:12px;font-size:13px;color:var(--ink-dim);line-height:1.7;max-height:120px;overflow-y:auto;}
+  .log p{margin:0 0 2px;}
+
+  .phase-banner{text-align:center;font-size:14px;font-weight:700;color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:14px;}
+  .phase-banner.mine{color:#bfe0ff;} .phase-banner.theirs{color:var(--ink-dim);} .phase-banner.defend{color:#e8b8c2;}
+
+  .zone{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px 18px;margin-bottom:14px;}
+  .zone-title{font-size:12px;color:var(--ink-dim);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+  .zone-title .dot{width:7px;height:7px;border-radius:50%;} .dot.n{background:var(--gold);} .dot.e{background:var(--enh);}
+  .hand{display:flex;gap:10px;flex-wrap:wrap;}
+  .card{width:72px;height:98px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:2px solid transparent;position:relative;transition:transform .15s,box-shadow .15s;user-select:none;background:var(--panel-2);}
+  .card:hover{transform:translateY(-4px);}
+  .card.selected{transform:translateY(-8px);box-shadow:0 6px 16px rgba(0,0,0,.5);}
+  .card.disabled{opacity:.35;cursor:not-allowed;} .card.disabled:hover{transform:none;}
+  .card.attack{border-color:var(--atk-soft);} .card.attack.selected{border-color:var(--atk);background:linear-gradient(160deg,var(--atk-soft),var(--panel-2));}
+  .card.defense{border-color:var(--def-soft);} .card.defense.selected{border-color:var(--def);background:linear-gradient(160deg,var(--def-soft),var(--panel-2));}
+  .card.heal{border-color:var(--heal-soft);} .card.heal.selected{border-color:var(--heal);background:linear-gradient(160deg,var(--heal-soft),var(--panel-2));}
+  .card.enhance{border-color:var(--enh-soft);} .card.enhance.selected{border-color:var(--enh);background:linear-gradient(160deg,var(--enh-soft),var(--panel-2));}
+  .card-label{font-size:10px;letter-spacing:.5px;color:var(--ink-dim);margin-bottom:4px;}
+  .card-value{font-family:'Cinzel',serif;font-size:24px;font-weight:700;color:var(--ink);}
+  .card.enhance .card-value{font-size:16px;}
+  .empty-hint{font-size:12px;color:var(--ink-dim);padding:20px 0;}
+
+  .actions{display:flex;gap:10px;justify-content:center;margin-top:6px;flex-wrap:wrap;}
+  button.act{font-family:'Noto Sans KR',sans-serif;font-size:14px;font-weight:700;padding:12px 22px;border-radius:8px;border:none;cursor:pointer;}
+  button.act:disabled{opacity:.35;cursor:not-allowed;}
+  .btn-primary{background:var(--gold);color:#1a1712;}
+  .btn-heal{background:var(--heal);color:#0f1f16;}
+  .btn-secondary{background:var(--panel-2);color:var(--ink);border:1px solid var(--line);}
+  .btn-danger{background:transparent;color:var(--ink-dim);border:1px solid var(--line);}
+
+  .preview{text-align:center;font-size:13px;color:var(--ink-dim);margin-bottom:10px;min-height:18px;}
+  .preview b{color:var(--gold);}
+
+  .end-overlay{position:fixed;inset:0;background:rgba(10,9,15,.86);display:flex;align-items:center;justify-content:center;z-index:50;}
+  .end-card{background:var(--panel);border:1px solid var(--gold-soft);border-radius:12px;padding:40px 50px;text-align:center;}
+  .end-card h2{font-family:'Cinzel',serif;color:var(--gold);font-size:30px;margin:0 0 10px;}
+  .end-card p{color:var(--ink-dim);margin-bottom:22px;}
+  .room-tag{position:fixed;top:10px;right:14px;font-size:11px;color:var(--ink-dim);letter-spacing:1px;}
+
+  @media (max-width:480px){.card{width:58px;height:82px;} .card-value{font-size:18px;} h1{font-size:22px;}}
+</style>
+</head>
+<body>
+
+<div id="joinScreen">
+  <div class="app">
+    <h1>강화의 전장</h1>
+    <div class="subtitle">친구와 실시간 1대1 대전</div>
+    <div class="join-box">
+      <input id="roomInput" maxlength="8" placeholder="방 코드 (예: ROOM1)" />
+      <button id="joinBtn">입장하기</button>
+      <div class="join-error" id="joinError"></div>
+      <div class="join-hint">같은 방 코드를 입력하면 서로 연결됩니다.<br>먼저 들어온 사람이 플레이어 1이 됩니다.</div>
+    </div>
+  </div>
+</div>
+
+<div id="gameScreen" style="display:none;">
+  <div class="room-tag" id="roomTag"></div>
+  <div class="app">
+    <h1>강화의 전장</h1>
+    <div class="subtitle">공격·방어·회복 카드를 굴리고, 강화카드로 공격력을 끌어올려라</div>
+    <div class="turn-counter">TURN <b id="turnNum">1</b></div>
+
+    <div class="board">
+      <div class="fighter-row">
+        <div class="fighter">
+          <div class="fighter-name"><b id="meName">나</b></div>
+          <div class="hpbar-track"><div class="hpbar-fill" id="meHpFill"></div></div>
+          <div class="hp-num" id="meHpNum">100 / 100</div>
+        </div>
+        <div class="vs">VS</div>
+        <div class="fighter op">
+          <div class="fighter-name"><b id="opName">상대</b></div>
+          <div class="hpbar-track"><div class="hpbar-fill" id="opHpFill"></div></div>
+          <div class="hp-num" id="opHpNum">100 / 100</div>
+        </div>
+      </div>
+      <div class="log" id="log"></div>
+    </div>
+
+    <div class="phase-banner" id="phaseBanner">대기 중...</div>
+    <div class="preview" id="preview">&nbsp;</div>
+
+    <div class="zone">
+      <div class="zone-title"><span class="dot n"></span>일반카드 (공격 / 방어 / 회복) · 최대 7장</div>
+      <div class="hand" id="normalHand"></div>
+    </div>
+
+    <div class="zone">
+      <div class="zone-title"><span class="dot e"></span>강화카드</div>
+      <div class="hand" id="enhanceHand"></div>
+    </div>
+
+    <div class="actions" id="actionBar"></div>
+  </div>
+</div>
+
+<div id="endOverlay" style="display:none;"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(function(){
+  const socket = io();
+  let me = null;
+  let code = null;
+  let latest = null;
+
+  let selAttack = null, selEnhance = null, selHeal = null, selDefense = null;
+
+  document.getElementById('joinBtn').onclick = () => {
+    const val = document.getElementById('roomInput').value.trim();
+    if(!val){ document.getElementById('joinError').textContent = '방 코드를 입력하세요.'; return; }
+    socket.emit('join', val);
+  };
+
+  socket.on('joinError', (msg) => {
+    document.getElementById('joinError').textContent = msg;
+  });
+
+  socket.on('joined', (data) => {
+    me = data.you;
+    code = data.code;
+    document.getElementById('joinScreen').style.display = 'none';
+    document.getElementById('gameScreen').style.display = 'block';
+    document.getElementById('roomTag').textContent = '방: ' + code;
+  });
+
+  socket.on('state', (data) => {
+    me = data.you;
+    latest = data.state;
+    render();
+  });
+
+  function clearSel(){ selAttack = selEnhance = selHeal = selDefense = null; }
+
+  function render(){
+    if(!latest) return;
+    const opp = 1 - me;
+
+    document.getElementById('turnNum').textContent = latest.turnCount;
+    document.getElementById('meName').textContent = latest.names[me] + (latest.connected[me] ? '' : ' (연결끊김)');
+    document.getElementById('opName').textContent = latest.names[opp] + (latest.connected[opp] ? '' : ' (연결끊김)');
+    document.getElementById('meHpNum').textContent = `${latest.hp[me]} / 100`;
+    document.getElementById('opHpNum').textContent = `${latest.hp[opp]} / 100`;
+    document.getElementById('meHpFill').style.width = latest.hp[me] + '%';
+    document.getElementById('opHpFill').style.width = latest.hp[opp] + '%';
+
+    const logEl = document.getElementById('log');
+    logEl.innerHTML = latest.log.map(m => `<p>${m}</p>`).join('');
+    logEl.scrollTop = logEl.scrollHeight;
+
+    renderBanner();
+    renderHand();
+    renderEnhance();
+    renderActions();
+    renderPreview();
+
+    if(latest.gameOver && document.getElementById('endOverlay').style.display === 'none'){
+      showEnd();
+    }
+  }
+
+  function myTurnAttack(){ return latest.phase === 'ATTACK' && latest.turnPlayer === me; }
+  function myTurnDefend(){ return latest.phase === 'DEFEND' && latest.pendingAttack && (1 - latest.pendingAttack.attackerIdx) === me; }
+
+  function renderBanner(){
+    const b = document.getElementById('phaseBanner');
+    if(latest.gameOver){ b.textContent = '전투 종료'; b.className = 'phase-banner'; return; }
+    if(myTurnAttack()){
+      b.textContent = '내 턴 — 공격 / 회복 카드를 선택하세요';
+      b.className = 'phase-banner mine';
+    } else if(myTurnDefend()){
+      b.textContent = `상대의 공격! 공격력 ${latest.pendingAttack.total} — 방어하거나 그대로 맞으세요`;
+      b.className = 'phase-banner defend';
+    } else if(latest.phase === 'DEFEND'){
+      b.textContent = '상대가 방어를 결정하는 중...';
+      b.className = 'phase-banner theirs';
+    } else {
+      b.textContent = '상대의 턴을 기다리는 중...';
+      b.className = 'phase-banner theirs';
+    }
+  }
+
+  function renderHand(){
+    const el = document.getElementById('normalHand');
+    el.innerHTML = '';
+    const hand = latest.hands[me];
+    if(!hand || hand.length === 0){ el.innerHTML = '<div class="empty-hint">손에 든 카드가 없습니다.</div>'; return; }
+
+    hand.forEach(card => {
+      const div = document.createElement('div');
+      let selectable = false, selected = false;
+
+      if(myTurnAttack() && card.type === 'attack'){ selectable = true; selected = selAttack === card.id; }
+      else if(myTurnAttack() && card.type === 'heal'){ selectable = true; selected = selHeal === card.id; }
+      else if(myTurnDefend() && card.type === 'defense'){ selectable = true; selected = selDefense === card.id; }
+
+      const label = card.type==='attack' ? '공격' : card.type==='defense' ? '방어' : '회복';
+      div.className = `card ${card.type} ${selected?'selected':''} ${selectable?'':'disabled'}`;
+      div.innerHTML = `<div class="card-label">${label}</div><div class="card-value">${card.value}</div>`;
+      if(selectable){
+        div.onclick = () => {
+          if(card.type==='attack'){ selAttack = selAttack===card.id?null:card.id; selHeal=null; }
+          else if(card.type==='heal'){ selHeal = selHeal===card.id?null:card.id; selAttack=null; selEnhance=null; }
+          else { selDefense = selDefense===card.id?null:card.id; }
+          render();
+        };
+      }
+      el.appendChild(div);
+    });
+  }
+
+  function renderEnhance(){
+    const el = document.getElementById('enhanceHand');
+    el.innerHTML = '';
+    const hand = latest.enhance[me];
+    if(!hand || hand.length === 0){ el.innerHTML = '<div class="empty-hint">강화카드가 없습니다.</div>'; return; }
+    const canUse = myTurnAttack() && selAttack !== null;
+    hand.forEach(card => {
+      const div = document.createElement('div');
+      const selected = selEnhance === card.id;
+      div.className = `card enhance ${selected?'selected':''} ${canUse?'':'disabled'}`;
+      div.innerHTML = `<div class="card-label">강화</div><div class="card-value">${card.min}~${card.max}</div>`;
+      if(canUse){ div.onclick = () => { selEnhance = selEnhance===card.id?null:card.id; render(); }; }
+      el.appendChild(div);
+    });
+  }
+
+  function renderPreview(){
+    const el = document.getElementById('preview');
+    if(myTurnAttack()){
+      if(selAttack){
+        const atk = latest.hands[me].find(c=>c.id===selAttack);
+        if(selEnhance){
+          const enh = latest.enhance[me].find(c=>c.id===selEnhance);
+          el.innerHTML = `공격력 <b>${atk.value}</b> + 강화 <b>${enh.min}~${enh.max}</b> (랜덤 적용 예정)`;
+        } else {
+          el.innerHTML = `공격력 <b>${atk.value}</b> 로 공격 준비`;
+        }
+      } else if(selHeal){
+        const heal = latest.hands[me].find(c=>c.id===selHeal);
+        el.innerHTML = `체력 <b>${heal.value}</b> 회복 예정`;
+      } else { el.innerHTML = '&nbsp;'; }
+    } else if(myTurnDefend()){
+      const atk = latest.pendingAttack;
+      if(selDefense){
+        const def = latest.hands[me].find(c=>c.id===selDefense);
+        const dmg = Math.max(0, atk.total - def.value);
+        el.innerHTML = `방어력 <b>${def.value}</b> 적용 시 예상 피해 <b>${dmg}</b> (재사용 가능)`;
+      } else {
+        el.innerHTML = `방어하지 않으면 <b>${atk.total}</b> 의 피해를 그대로 받습니다`;
+      }
+    } else { el.innerHTML = '&nbsp;'; }
+  }
+
+  function renderActions(){
+    const bar = document.getElementById('actionBar');
+    bar.innerHTML = '';
+    if(latest.gameOver) return;
+
+    if(myTurnAttack()){
+      const atkBtn = document.createElement('button');
+      atkBtn.className = 'act btn-primary'; atkBtn.textContent = '공격!';
+      atkBtn.disabled = !selAttack;
+      atkBtn.onclick = () => {
+        socket.emit('action', { type:'attack', cardId: selAttack, enhanceId: selEnhance });
+        clearSel();
+      };
+      bar.appendChild(atkBtn);
+
+      const healBtn = document.createElement('button');
+      healBtn.className = 'act btn-heal'; healBtn.textContent = '회복!';
+      healBtn.disabled = !selHeal;
+      healBtn.onclick = () => {
+        socket.emit('action', { type:'heal', cardId: selHeal });
+        clearSel();
+      };
+      bar.appendChild(healBtn);
+
+      const passBtn = document.createElement('button');
+      passBtn.className = 'act btn-secondary'; passBtn.textContent = '패스';
+      passBtn.onclick = () => { socket.emit('action', { type:'pass' }); clearSel(); };
+      bar.appendChild(passBtn);
+    } else if(myTurnDefend()){
+      const defBtn = document.createElement('button');
+      defBtn.className = 'act btn-primary'; defBtn.textContent = '방어!';
+      defBtn.disabled = !selDefense;
+      defBtn.onclick = () => {
+        socket.emit('action', { type:'defend', cardId: selDefense });
+        clearSel();
+      };
+      bar.appendChild(defBtn);
+
+      const takeBtn = document.createElement('button');
+      takeBtn.className = 'act btn-danger'; takeBtn.textContent = '그냥 맞는다';
+      takeBtn.onclick = () => { socket.emit('action', { type:'take' }); clearSel(); };
+      bar.appendChild(takeBtn);
+    }
+  }
+
+  function showEnd(){
+    const overlay = document.getElementById('endOverlay');
+    overlay.style.display = 'flex';
+    overlay.className = 'end-overlay';
+    const won = latest.winner === me;
+    overlay.innerHTML = `
+      <div class="end-card">
+        <h2>${won ? '승리!' : '패배...'}</h2>
+        <p>${won ? '상대의 체력을 0으로 만들었습니다.' : '내 체력이 0이 되어 쓰러졌습니다.'}</p>
+        <p style="font-size:12px;">다시 하려면 페이지를 새로고침한 뒤 같은 방 코드로 재입장하세요.</p>
+      </div>`;
+  }
+})();
+</script>
+</body>
+</html>

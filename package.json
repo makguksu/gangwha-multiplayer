@@ -1,0 +1,13 @@
+{
+  "name": "gangwha-jeonjang-mp",
+  "version": "1.0.0",
+  "description": "강화의 전장 - 친구와 1대1 실시간 대전",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}
